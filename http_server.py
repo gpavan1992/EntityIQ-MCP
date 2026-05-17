@@ -3,25 +3,23 @@ import asyncio
 import json
 import sys
 from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from contextlib import asynccontextmanager
 import subprocess
-from typing import AsyncGenerator
 
 app = FastAPI()
 mcp_process = None
-request_id_counter = 0
-pending_responses = {}
+request_counter = 0
 
-async def mcp_writer(request_data: dict):
-    """Send request to MCP server and stream responses"""
-    global request_id_counter, pending_responses
+async def send_mcp_request(request_data: dict):
+    """Send request to MCP process and get response"""
+    global request_counter, mcp_process
     
-    request_id_counter += 1
-    request_id = request_id_counter
-    request_data['id'] = request_id
+    request_counter += 1
+    msg_id = request_counter
+    request_data['id'] = msg_id
     
-    # Send request to MCP subprocess
+    # Send to MCP
     request_line = json.dumps(request_data) + "\n"
     mcp_process.stdin.write(request_line)
     mcp_process.stdin.flush()
@@ -32,16 +30,7 @@ async def mcp_writer(request_data: dict):
     
     if response_line:
         return json.loads(response_line)
-    return {"error": "No response from MCP"}
-
-async def stream_sse(request_data: dict) -> AsyncGenerator[str, None]:
-    """Stream MCP responses as SSE"""
-    try:
-        response = await mcp_writer(request_data)
-        # SSE format: data: {json}\n\n
-        yield f"data: {json.dumps(response)}\n\n"
-    except Exception as e:
-        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    return {"error": "No response"}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -52,11 +41,13 @@ async def lifespan(app: FastAPI):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        bufsize=1
+        bufsize=1,
+        cwd="/Users/gpavan92/Desktop/entityiq-mcp"
     )
     yield
     if mcp_process:
         mcp_process.terminate()
+        mcp_process.wait()
 
 app = FastAPI(lifespan=lifespan)
 
@@ -66,18 +57,13 @@ async def health():
 
 @app.post("/mcp")
 async def mcp_handler(request: Request):
-    """Handle both JSON-RPC and SSE requests"""
+    """Handle MCP requests via HTTP POST with JSON-RPC"""
     try:
-        request_data = await request.json()
+        body = await request.json()
     except:
         return {"error": "Invalid JSON"}
     
-    # If it's an SSE request, stream responses
-    if request.headers.get('accept') == 'text/event-stream':
-        return StreamingResponse(stream_sse(request_data), media_type="text/event-stream")
-    
-    # Otherwise return JSON directly
-    response = await mcp_writer(request_data)
+    response = await send_mcp_request(body)
     return response
 
 if __name__ == "__main__":
