@@ -1,0 +1,33 @@
+{
+  "name": "entityiq-mcp",
+  "version": "1.0.0",
+  "description": "[![MCP Registry](https://img.shields.io/badge/MCP_Registry-active-brightgreen)](https://registry.modelcontextprotocol.io) [![Railway](https://img.shields.io/badge/Railway-deployed-blueviolet)](https://entityiq-mcp-production.up.railway.app) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Python](https://img.shields.io/badge/Python-3.12%2B-blue)](https://github.com/gpavan1992/EntityIQ-MCP)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gpavan1992/EntityIQ-MCP.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/gpavan1992/EntityIQ-MCP/issues"
+  },
+  "homepage": "https://github.com/gpavan1992/EntityIQ-MCP#readme",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.96.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.8.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.22.1",
+    "typescript": "^6.0.3"
+  }
+}
