@@ -3,9 +3,9 @@ import asyncio
 import json
 import sys
 from fastapi import FastAPI, Request
-from fastapi.responses import Response, StreamingResponse
 from contextlib import asynccontextmanager
 import subprocess
+import os
 
 app = FastAPI()
 mcp_process = None
@@ -35,14 +35,14 @@ async def send_mcp_request(request_data: dict):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global mcp_process
+    # Don't hardcode path - just run server.py from /app where it's copied
     mcp_process = subprocess.Popen(
         ["python3", "server.py"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        bufsize=1,
-        cwd="/Users/gpavan92/Desktop/entityiq-mcp"
+        bufsize=1
     )
     yield
     if mcp_process:
