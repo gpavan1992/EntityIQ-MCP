@@ -11,13 +11,13 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server for instituti
 
 ## ⚡ Public Endpoint (no setup required)
 
-MCP endpoint: `https://entityiq-mcp-production.up.railway.app`
+MCP endpoint: https://entityiq-mcp-production.up.railway.app
 
 ---
 
 ## Tools (8)
 
-### 🏢 SEC & Company Intelligence
+### 🏢 SEC & Company Intelligence — SEC EDGAR
 
 | Tool | Description |
 |---|---|
@@ -26,25 +26,25 @@ MCP endpoint: `https://entityiq-mcp-production.up.railway.app`
 | `get_company_financials` | Revenue, net income, assets — historical XBRL data (up to 20 years) |
 | `search_sec_filings` | Full-text search across all 10-K, 10-Q, and 8-K filings |
 
-### 🌍 Macroeconomics & Trade — World Bank Open Data
+### 🌍 Macroeconomics — World Bank Open Data
 
 | Tool | Description |
 |---|---|
 | `get_macro_indicators` | GDP, inflation, unemployment, FDI, trade — any country (1960–present) |
 
-### 💱 Foreign Exchange
+### 💱 Foreign Exchange — open.er-api.com + ECB
 
 | Tool | Description |
 |---|---|
 | `get_fx_rates` | Live and historical FX rates for 160+ currencies |
 
-### 🔐 Securities & Identifiers
+### 🔐 Securities & Identifiers — OpenFIGI
 
 | Tool | Description |
 |---|---|
 | `get_security_info` | Ticker → FIGI, security type, market sector (batch up to 10) |
 
-### 🗺️ Country Intelligence
+### 🗺️ Country Intelligence — REST Countries
 
 | Tool | Description |
 |---|---|
@@ -58,8 +58,6 @@ MCP endpoint: `https://entityiq-mcp-production.up.railway.app`
 
 Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
-**Option A — Remote (hosted on Railway, no setup):**
-
 ```json
 {
   "mcpServers": {
@@ -69,19 +67,6 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
         "mcp-remote",
         "https://entityiq-mcp-production.up.railway.app"
       ]
-    }
-  }
-}
-```
-
-**Option B — Local (clone & run):**
-
-```json
-{
-  "mcpServers": {
-    "📊 EntityIQ MCP": {
-      "command": "python",
-      "args": ["/path/to/entityiq-mcp/server.py"]
     }
   }
 }
@@ -103,52 +88,47 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
 
 ---
 
+## Example Prompts
+
+Once connected, ask your AI agent:
+
+- *"Look up Tesla's SEC filings and show me revenue for the last 5 years"*
+- *"Search 10-K filings mentioning 'climate risk' — which companies come up?"*
+- *"Compare India and Germany's GDP, inflation, and unemployment 2015–2023"*
+- *"What's the live USD to EUR, GBP, INR, and JPY rate?"*
+- *"Get FIGI identifiers for Apple, Microsoft, and Nvidia"*
+- *"Show me Brazil's country profile — currency, languages, timezone, TLD"*
+- *"What's Microsoft's net income trend from 2020 to 2024?"*
+- *"Find all companies filing 10-Ks mentioning 'AI' or 'machine learning' in 2023"*
+- *"Compare US unemployment rate vs India's trend since 2015"*
+
+---
+
 ## Data Sources
 
-| API | Coverage | Auth |
-|---|---|---|
-| SEC EDGAR | US public company filings, XBRL financials | User-Agent header only |
-| World Bank Open Data | Macroeconomic indicators, 200+ countries (1960–present) | None |
-| OpenFIGI | Bloomberg financial instrument identifiers | None (25 req/min free) |
-| open.er-api.com | Live FX rates, 160+ currencies | None |
-| Frankfurter / ECB | Historical FX data since 1999 | None |
-| RestCountries | Country profiles, capitals, currencies, languages | None |
+| Domain | Source | License | Key Required |
+|---|---|---|---|
+| SEC Filings | [SEC EDGAR](https://www.sec.gov/developer) | Public Domain | No |
+| Company Financials | [SEC EDGAR XBRL](https://www.sec.gov/developer) | Public Domain | No |
+| Macroeconomics | [World Bank Open Data](https://data.worldbank.org) | CC BY 4.0 | No |
+| FX Rates (Live) | [open.er-api.com](https://open.er-api.com) | Open | No |
+| FX Rates (Historical) | [Frankfurter / ECB](https://api.frankfurter.dev) | ODbL | No |
+| Securities IDs | [OpenFIGI](https://www.openfigi.com) | CC BY 4.0 | No (25 req/min free) |
+| Country Data | [REST Countries](https://restcountries.com) | MPL 2.0 | No |
 
 ---
 
-## Example Queries
+## Notes
 
-Once connected to Claude:
-
-> *"Look up Tesla's SEC filings and show me revenue for the last 5 years"*
-
-> *"Search 10-K filings mentioning 'climate risk' — which companies come up?"*
-
-> *"Compare India and Germany's GDP, inflation, and unemployment over the past 5 years"*
-
-> *"What's the live USD to EUR, GBP, INR, and JPY rate?"*
-
-> *"Get FIGI identifiers for Apple, Microsoft, and Nvidia"*
-
-> *"Give me a business profile for Brazil — currency, languages, TLD, borders"*
-
----
-
-## Quickstart (Local)
-
-```bash
-git clone https://github.com/gpavan1992/EntityIQ-MCP
-cd EntityIQ-MCP
-pip install "mcp[cli]>=1.6.0" httpx pydantic
-python server.py
-```
+- All tools support structured JSON responses for agent pipelines
+- SEC EDGAR rate limit: ~10 requests/second (recommended)
+- OpenFIGI free tier: 25 requests/minute without a key
+- World Bank data lags 1–2 years for some indicators
+- FX historical rates available back to 1999 (ECB data)
+- No API keys required for any data source
 
 ---
 
 ## License
 
-MIT
-
----
-
-Built by [Pavan Kumar Galiveeti](https://www.linkedin.com/in/pavan-kumar-galiveeti-a44335192/)
+MIT — built by [Pavan Kumar Galiveeti](https://www.linkedin.com/in/pavan-kumar-galiveeti-a44335192/)
