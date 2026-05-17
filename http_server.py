@@ -3,6 +3,7 @@ import asyncio
 import json
 import sys
 from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
 import subprocess
 import os
@@ -10,32 +11,11 @@ import os
 app = FastAPI()
 mcp_process = None
 request_counter = 0
-
-async def send_mcp_request(request_data: dict):
-    """Send request to MCP process and get response"""
-    global request_counter, mcp_process
-    
-    request_counter += 1
-    msg_id = request_counter
-    request_data['id'] = msg_id
-    
-    # Send to MCP
-    request_line = json.dumps(request_data) + "\n"
-    mcp_process.stdin.write(request_line)
-    mcp_process.stdin.flush()
-    
-    # Read response
-    loop = asyncio.get_event_loop()
-    response_line = await loop.run_in_executor(None, mcp_process.stdout.readline)
-    
-    if response_line:
-        return json.loads(response_line)
-    return {"error": "No response"}
+lock = asyncio.Lock()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global mcp_process
-    # Don't hardcode path - just run server.py from /app where it's copied
     mcp_process = subprocess.Popen(
         ["python3", "server.py"],
         stdin=subprocess.PIPE,
@@ -47,9 +27,46 @@ async def lifespan(app: FastAPI):
     yield
     if mcp_process:
         mcp_process.terminate()
-        mcp_process.wait()
+        try:
+            mcp_process.wait(timeout=5)
+        except:
+            mcp_process.kill()
 
 app = FastAPI(lifespan=lifespan)
+
+async def send_to_mcp(data: dict) -> dict:
+    """Send JSON to MCP process and read response"""
+    global request_counter, mcp_process
+    
+    async with lock:
+        request_counter += 1
+        data['id'] = request_counter
+        
+        request_line = json.dumps(data) + "\n"
+        mcp_process.stdin.write(request_line)
+        mcp_process.stdin.flush()
+        
+        loop = asyncio.get_event_loop()
+        response_line = await loop.run_in_executor(None, mcp_process.stdout.readline)
+        
+        if response_line:
+            try:
+                return json.loads(response_line)
+            except json.JSONDecodeError:
+                return {"error": "Invalid JSON response from MCP"}
+        return {"error": "No response from MCP"}
+
+async def sse_stream(request_body: dict):
+    """Stream MCP messages via SSE"""
+    try:
+        # Send initial request to MCP
+        response = await send_to_mcp(request_body)
+        
+        # Stream response as SSE
+        yield f"data: {json.dumps(response)}\n\n"
+        
+    except Exception as e:
+        yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
 @app.get("/health")
 async def health():
@@ -57,14 +74,21 @@ async def health():
 
 @app.post("/mcp")
 async def mcp_handler(request: Request):
-    """Handle MCP requests via HTTP POST with JSON-RPC"""
+    """Handle MCP protocol via SSE streaming"""
     try:
         body = await request.json()
-    except:
-        return {"error": "Invalid JSON"}
+    except Exception as e:
+        return {"error": f"Invalid JSON: {str(e)}"}
     
-    response = await send_mcp_request(body)
-    return response
+    return StreamingResponse(
+        sse_stream(body),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 if __name__ == "__main__":
     import uvicorn
