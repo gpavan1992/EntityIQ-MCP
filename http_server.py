@@ -2,37 +2,49 @@
 import asyncio
 import json
 import sys
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
 import subprocess
+from typing import AsyncGenerator
 
 app = FastAPI()
 mcp_process = None
-request_queue = asyncio.Queue()
-response_map = {}
-message_counter = 0
+request_id_counter = 0
+pending_responses = {}
 
-async def mcp_reader():
-    """Read responses from MCP server"""
-    global response_map
-    while True:
-        try:
-            line = await asyncio.get_event_loop().run_in_executor(
-                None, 
-                mcp_process.stdout.readline
-            )
-            if not line:
-                break
-            response = json.loads(line)
-            msg_id = response.get('id')
-            if msg_id and msg_id in response_map:
-                response_map[msg_id]['result'] = response
-                response_map[msg_id]['event'].set()
-        except Exception as e:
-            print(f"Error reading from MCP: {e}", file=sys.stderr)
-            break
+async def mcp_writer(request_data: dict):
+    """Send request to MCP server and stream responses"""
+    global request_id_counter, pending_responses
+    
+    request_id_counter += 1
+    request_id = request_id_counter
+    request_data['id'] = request_id
+    
+    # Send request to MCP subprocess
+    request_line = json.dumps(request_data) + "\n"
+    mcp_process.stdin.write(request_line)
+    mcp_process.stdin.flush()
+    
+    # Read response
+    loop = asyncio.get_event_loop()
+    response_line = await loop.run_in_executor(None, mcp_process.stdout.readline)
+    
+    if response_line:
+        return json.loads(response_line)
+    return {"error": "No response from MCP"}
 
-async def start_mcp():
+async def stream_sse(request_data: dict) -> AsyncGenerator[str, None]:
+    """Stream MCP responses as SSE"""
+    try:
+        response = await mcp_writer(request_data)
+        # SSE format: data: {json}\n\n
+        yield f"data: {json.dumps(response)}\n\n"
+    except Exception as e:
+        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global mcp_process
     mcp_process = subprocess.Popen(
         ["python3", "server.py"],
@@ -42,11 +54,6 @@ async def start_mcp():
         text=True,
         bufsize=1
     )
-    asyncio.create_task(mcp_reader())
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await start_mcp()
     yield
     if mcp_process:
         mcp_process.terminate()
@@ -55,46 +62,23 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "EntityIQ MCP"}
-
-@app.get("/")
-async def root():
-    return {"name": "EntityIQ MCP", "version": "1.0.0"}
+    return {"status": "ok"}
 
 @app.post("/mcp")
-async def mcp_handler(request: dict):
-    global message_counter, response_map
-    
-    if not mcp_process or mcp_process.poll() is not None:
-        return {"error": "MCP server not running"}
-    
-    message_counter += 1
-    msg_id = message_counter
-    request['id'] = msg_id
-    
-    # Create event for response
-    response_map[msg_id] = {'event': asyncio.Event(), 'result': None}
-    
+async def mcp_handler(request: Request):
+    """Handle both JSON-RPC and SSE requests"""
     try:
-        # Send request
-        request_line = json.dumps(request) + "\n"
-        await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: mcp_process.stdin.write(request_line) or mcp_process.stdin.flush()
-        )
-        
-        # Wait for response (5 second timeout)
-        await asyncio.wait_for(response_map[msg_id]['event'].wait(), timeout=5.0)
-        result = response_map[msg_id]['result']
-        del response_map[msg_id]
-        return result
-    except asyncio.TimeoutError:
-        del response_map[msg_id]
-        return {"error": "MCP request timeout"}
-    except Exception as e:
-        if msg_id in response_map:
-            del response_map[msg_id]
-        return {"error": str(e)}
+        request_data = await request.json()
+    except:
+        return {"error": "Invalid JSON"}
+    
+    # If it's an SSE request, stream responses
+    if request.headers.get('accept') == 'text/event-stream':
+        return StreamingResponse(stream_sse(request_data), media_type="text/event-stream")
+    
+    # Otherwise return JSON directly
+    response = await mcp_writer(request_data)
+    return response
 
 if __name__ == "__main__":
     import uvicorn
