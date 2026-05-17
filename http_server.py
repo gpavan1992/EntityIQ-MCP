@@ -16,6 +16,7 @@ lock = asyncio.Lock()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global mcp_process
+    print("Starting MCP server subprocess...", file=sys.stderr)
     mcp_process = subprocess.Popen(
         ["python3", "server.py"],
         stdin=subprocess.PIPE,
@@ -24,6 +25,7 @@ async def lifespan(app: FastAPI):
         text=True,
         bufsize=1
     )
+    print(f"MCP process started with PID {mcp_process.pid}", file=sys.stderr)
     yield
     if mcp_process:
         mcp_process.terminate()
@@ -43,11 +45,13 @@ async def send_to_mcp(data: dict) -> dict:
         data['id'] = request_counter
         
         request_line = json.dumps(data) + "\n"
+        print(f"Sending to MCP: {request_line}", file=sys.stderr)
         mcp_process.stdin.write(request_line)
         mcp_process.stdin.flush()
         
         loop = asyncio.get_event_loop()
         response_line = await loop.run_in_executor(None, mcp_process.stdout.readline)
+        print(f"Got response: {response_line}", file=sys.stderr)
         
         if response_line:
             try:
@@ -59,13 +63,14 @@ async def send_to_mcp(data: dict) -> dict:
 async def sse_stream(request_body: dict):
     """Stream MCP messages via SSE"""
     try:
-        # Send initial request to MCP
+        print(f"SSE stream called with: {request_body}", file=sys.stderr)
         response = await send_to_mcp(request_body)
+        print(f"About to yield SSE: {response}", file=sys.stderr)
         
-        # Stream response as SSE
         yield f"data: {json.dumps(response)}\n\n"
         
     except Exception as e:
+        print(f"SSE error: {e}", file=sys.stderr)
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
 @app.get("/health")
