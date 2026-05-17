@@ -524,4 +524,4 @@ async def get_country_profile(params: CountryProfileInput) -> str:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable_http", port=3000)
+    mcp.run(transport="streamable_http")
