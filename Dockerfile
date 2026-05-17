@@ -2,11 +2,9 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Copy Python server
-COPY server.py .
-
-# Copy Node wrapper
+# Copy all files
 COPY package.json package-lock.json tsconfig.json http_server.ts ./
+COPY server.py .
 
 # Install Node deps
 RUN npm ci
