@@ -151,5 +151,4 @@ MIT
 
 ---
 
-Built by [Pavan Kumar Galiveeti](https://www.linkedin.com/in/pavan-kumar-galiveeti-a44335192/)  
-Part of the GlobalPulse / Bharat MCP family
+Built by [Pavan Kumar Galiveeti](https://www.linkedin.com/in/pavan-kumar-galiveeti-a44335192/)
