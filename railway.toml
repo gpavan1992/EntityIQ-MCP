@@ -3,5 +3,4 @@ builder = "dockerfile"
 
 [deploy]
 startCommand = "python server.py"
-healthcheckPath = "/health"
 restartPolicyType = "on_failure"
